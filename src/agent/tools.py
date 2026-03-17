@@ -4,7 +4,8 @@ Add new tools by defining functions decorated with ``@tool`` and
 appending them to the ``ALL_TOOLS`` list at the bottom of this file.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 from langchain_core.tools import tool
 
@@ -12,7 +13,7 @@ from langchain_core.tools import tool
 @tool
 def get_current_time() -> str:
     """Get the current UTC time."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -28,6 +29,6 @@ def get_current_time() -> str:
 # Then add `search_web` to the list below.
 # ---------------------------------------------------------------------------
 
-ALL_TOOLS: list = [
+ALL_TOOLS: list[Any] = [
     get_current_time,
 ]

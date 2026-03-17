@@ -5,16 +5,16 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
-
-from langchain_core.messages import AIMessage, HumanMessage
 
 from agent.config import Settings
 from agent.graph import build_graph
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 class InvokeRequest(BaseModel):
     """Request body for the /invoke endpoint."""
 
-    messages: list[dict]  # Each dict has "role" and "content"
+    messages: list[dict[str, Any]]  # Each dict has "role" and "content"
     thread_id: str | None = None
 
 
@@ -44,7 +44,7 @@ class InvokeResponse(BaseModel):
 class StreamRequest(BaseModel):
     """Request body for the /stream endpoint."""
 
-    messages: list[dict]  # Each dict has "role" and "content"
+    messages: list[dict[str, Any]]  # Each dict has "role" and "content"
     thread_id: str | None = None
 
 
@@ -59,7 +59,9 @@ class ErrorResponse(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _convert_messages(raw_messages: list[dict]) -> list[HumanMessage | AIMessage]:
+def _convert_messages(
+    raw_messages: list[dict[str, Any]],
+) -> list[HumanMessage | AIMessage]:
     """Convert plain dicts to LangChain message objects."""
     converted: list[HumanMessage | AIMessage] = []
     for msg in raw_messages:
@@ -110,7 +112,7 @@ def create_app(settings: Settings) -> FastAPI:
     # -- Endpoints ----------------------------------------------------------
 
     @app.get("/health")
-    async def health() -> dict:
+    async def health() -> dict[str, str]:
         return {"status": "ok"}
 
     @app.post("/invoke", response_model=InvokeResponse)
@@ -146,7 +148,7 @@ def create_app(settings: Settings) -> FastAPI:
         messages = _convert_messages(body.messages)
         config = {"configurable": {"thread_id": thread_id}}
 
-        async def event_generator() -> AsyncGenerator[dict, None]:
+        async def event_generator() -> AsyncGenerator[dict[str, str], None]:
             try:
                 async for event in app.state.graph.astream_events(
                     {"messages": messages},
@@ -160,7 +162,9 @@ def create_app(settings: Settings) -> FastAPI:
                         if content:
                             yield {
                                 "event": "on_chat_model_stream",
-                                "data": json.dumps({"token": content, "thread_id": thread_id}),
+                                "data": json.dumps(
+                                    {"token": content, "thread_id": thread_id}
+                                ),
                             }
 
                     elif kind == "on_tool_start":

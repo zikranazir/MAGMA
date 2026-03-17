@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, YamlConfigSettingsSource
-
 from langchain_core.language_models.chat_models import BaseChatModel
-
+from pydantic import BaseModel
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    YamlConfigSettingsSource,
+)
 
 # ---------------------------------------------------------------------------
 # Sub-config models

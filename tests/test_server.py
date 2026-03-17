@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -25,37 +26,42 @@ def mock_graph() -> MagicMock:
 
 
 @pytest.fixture()
-def app(test_settings: Settings, mock_graph: MagicMock) -> object:
-    """Create a FastAPI app with the graph already patched in."""
-    with patch("agent.server.build_graph", return_value=mock_graph), \
-         patch("agent.server.setup_logging"):
-        application = create_app(test_settings)
-    return application
+async def client(
+    test_settings: Settings, mock_graph: MagicMock
+) -> AsyncGenerator[AsyncClient, None]:
+    """Create an async test client with mocked graph."""
+    with (
+        patch("agent.server.build_graph", return_value=mock_graph),
+        patch("agent.server.setup_logging"),
+    ):
+        app = create_app(test_settings)
+        # Manually set graph on state since lifespan may not run with ASGITransport
+        app.state.graph = mock_graph
+        transport = ASGITransport(app=app)  # type: ignore[arg-type]
+        async with AsyncClient(transport=transport, base_url="http://test") as c:
+            yield c
 
 
 @pytest.mark.asyncio
-async def test_health_returns_ok(app: object) -> None:
+async def test_health_returns_ok(client: AsyncClient) -> None:
     """GET /health should return 200 with status ok."""
-    transport = ASGITransport(app=app)  # type: ignore[arg-type]
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.get("/health")
-
+    resp = await client.get("/health")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
 
 
 @pytest.mark.asyncio
-async def test_invoke_returns_response(app: object, mock_graph: MagicMock) -> None:
+async def test_invoke_returns_response(
+    client: AsyncClient, mock_graph: MagicMock
+) -> None:
     """POST /invoke should return the AI response and a thread_id."""
-    transport = ASGITransport(app=app)  # type: ignore[arg-type]
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.post(
-            "/invoke",
-            json={
-                "messages": [{"role": "user", "content": "Hello"}],
-                "thread_id": "test-thread-123",
-            },
-        )
+    resp = await client.post(
+        "/invoke",
+        json={
+            "messages": [{"role": "user", "content": "Hello"}],
+            "thread_id": "test-thread-123",
+        },
+    )
 
     assert resp.status_code == 200
     data = resp.json()
@@ -65,14 +71,12 @@ async def test_invoke_returns_response(app: object, mock_graph: MagicMock) -> No
 
 
 @pytest.mark.asyncio
-async def test_invoke_generates_thread_id(app: object) -> None:
+async def test_invoke_generates_thread_id(client: AsyncClient) -> None:
     """POST /invoke without thread_id should auto-generate one."""
-    transport = ASGITransport(app=app)  # type: ignore[arg-type]
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.post(
-            "/invoke",
-            json={"messages": [{"role": "user", "content": "Hi"}]},
-        )
+    resp = await client.post(
+        "/invoke",
+        json={"messages": [{"role": "user", "content": "Hi"}]},
+    )
 
     assert resp.status_code == 200
     data = resp.json()
@@ -81,16 +85,16 @@ async def test_invoke_generates_thread_id(app: object) -> None:
 
 
 @pytest.mark.asyncio
-async def test_invoke_handles_error(app: object, mock_graph: MagicMock) -> None:
+async def test_invoke_handles_error(
+    client: AsyncClient, mock_graph: MagicMock
+) -> None:
     """POST /invoke should return 500 when the graph raises."""
     mock_graph.ainvoke = AsyncMock(side_effect=RuntimeError("boom"))
 
-    transport = ASGITransport(app=app)  # type: ignore[arg-type]
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.post(
-            "/invoke",
-            json={"messages": [{"role": "user", "content": "Fail"}]},
-        )
+    resp = await client.post(
+        "/invoke",
+        json={"messages": [{"role": "user", "content": "Fail"}]},
+    )
 
     assert resp.status_code == 500
     data = resp.json()

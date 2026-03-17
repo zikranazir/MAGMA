@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from langgraph.graph import END, StateGraph
-from langgraph.graph.state import CompiledStateGraph
 
 from agent.config import Settings, get_chat_model
 from agent.nodes import make_agent_node, make_tool_node
@@ -23,7 +24,7 @@ def should_continue(state: AgentState) -> str:
     return END
 
 
-def build_graph(settings: Settings) -> CompiledStateGraph:
+def build_graph(settings: Settings) -> Any:
     """Build and compile the LangGraph agent graph.
 
     Args:
@@ -47,7 +48,7 @@ def build_graph(settings: Settings) -> CompiledStateGraph:
     graph.add_edge("tools", "agent")
 
     # --- Checkpointer -------------------------------------------------
-    checkpointer = None
+    checkpointer: Any = None
 
     if settings.memory.enabled:
         if settings.memory.backend == "memory":

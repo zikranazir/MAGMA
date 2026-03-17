@@ -15,7 +15,6 @@ from agent.config import (
     get_chat_model,
 )
 
-
 # ---------------------------------------------------------------------------
 # Sub-config defaults
 # ---------------------------------------------------------------------------
@@ -89,11 +88,12 @@ class TestGetChatModel:
         test_settings.llm.provider = "openai"  # type: ignore[assignment]
         fake_cls = type("FakeChatOpenAI", (), {"__init__": lambda self, **kw: None})
 
-        with patch("agent.config.ChatOpenAI", fake_cls, create=True):
-            # Patch the lazy import inside get_chat_model
-            with patch.dict(
+        with (
+            patch("agent.config.ChatOpenAI", fake_cls, create=True),
+            patch.dict(
                 "sys.modules",
                 {"langchain_openai": type("mod", (), {"ChatOpenAI": fake_cls})()},
-            ):
-                model = get_chat_model(test_settings)
-                assert isinstance(model, fake_cls)
+            ),
+        ):
+            model = get_chat_model(test_settings)
+            assert isinstance(model, fake_cls)

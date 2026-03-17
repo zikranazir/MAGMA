@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.prebuilt import ToolNode
@@ -10,7 +11,7 @@ from langgraph.prebuilt import ToolNode
 from agent.state import AgentState
 
 
-def make_agent_node(model: BaseChatModel, tools: list) -> Callable:
+def make_agent_node(model: BaseChatModel, tools: list[Any]) -> Callable[..., Any]:
     """Create an agent node that invokes the chat model.
 
     The model is bound to the supplied tools **once** (inside this factory),
@@ -23,19 +24,16 @@ def make_agent_node(model: BaseChatModel, tools: list) -> Callable:
     Returns:
         A node function compatible with LangGraph's ``StateGraph``.
     """
-    if tools:
-        bound_model = model.bind_tools(tools)
-    else:
-        bound_model = model
+    bound_model = model.bind_tools(tools) if tools else model
 
-    def agent_node(state: AgentState) -> dict:
+    def agent_node(state: AgentState) -> dict[str, Any]:
         response = bound_model.invoke(state["messages"])
         return {"messages": [response]}
 
     return agent_node
 
 
-def make_tool_node(tools: list) -> ToolNode:
+def make_tool_node(tools: list[Any]) -> ToolNode:
     """Create a tool-execution node from the given tools.
 
     Args:
