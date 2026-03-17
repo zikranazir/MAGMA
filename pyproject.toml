@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-boilerplate"
+version = "0.1.0"
+description = "A production-ready starter kit for building AI agents with LangGraph"
+requires-python = ">=3.12"
+dependencies = [
+    "langgraph",
+    "langchain-core",
+    "langgraph-checkpoint-sqlite",
+    "pydantic-settings[yaml]",
+    "fastapi",
+    "uvicorn[standard]",
+    "sse-starlette",
+    "python-dotenv",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+openai = ["langchain-openai"]
+anthropic = ["langchain-anthropic"]
+google = ["langchain-google-genai"]
+all = [
+    "langchain-openai",
+    "langchain-anthropic",
+    "langchain-google-genai",
+]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+    "ruff",
+    "mypy",
+    "pre-commit",
+]
+
+[project.scripts]
+agent = "agent.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
