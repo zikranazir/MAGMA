@@ -1,4 +1,4 @@
-"""Agent state definition for the LangGraph agent."""
+"""Base agent state definition for LangGraph agents."""
 
 from typing import Annotated
 
@@ -7,8 +7,8 @@ from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
 
-class AgentState(TypedDict):
-    """State object passed between nodes in the agent graph.
+class BaseAgentState(TypedDict):
+    """Base state object passed between nodes in an agent graph.
 
     Attributes:
         messages: Conversation message history, managed by LangGraph's

@@ -1,4 +1,4 @@
-"""LangGraph graph construction for the agent."""
+"""LangGraph graph construction for agent2."""
 
 from __future__ import annotations
 
@@ -6,13 +6,13 @@ from typing import Any
 
 from langgraph.graph import END, StateGraph
 
+from agent.agents.agent2.nodes import make_agent_node, make_tool_node
+from agent.agents.agent2.state import Agent2State
+from agent.agents.agent2.tools import ALL_TOOLS
 from agent.config import Settings, get_chat_model
-from agent.nodes import make_agent_node, make_tool_node
-from agent.state import AgentState
-from agent.tools import ALL_TOOLS
 
 
-def should_continue(state: AgentState) -> str:
+def should_continue(state: Agent2State) -> str:
     """Decide whether the agent should call tools or finish.
 
     Returns ``"tools"`` if the last message contains tool calls,
@@ -25,7 +25,7 @@ def should_continue(state: AgentState) -> str:
 
 
 def build_graph(settings: Settings) -> Any:
-    """Build and compile the LangGraph agent graph.
+    """Build and compile the LangGraph agent graph for agent2.
 
     Args:
         settings: Application settings (LLM config, memory config, etc.).
@@ -39,7 +39,7 @@ def build_graph(settings: Settings) -> Any:
     tool_node = make_tool_node(ALL_TOOLS)
 
     # --- Graph --------------------------------------------------------
-    graph = StateGraph(AgentState)
+    graph = StateGraph(Agent2State)
     graph.add_node("agent", agent_node)
     graph.add_node("tools", tool_node)
 

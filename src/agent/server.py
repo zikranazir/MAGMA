@@ -1,4 +1,4 @@
-"""FastAPI server for the LangGraph agent."""
+"""FastAPI server for the LangGraph multi-agent system."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from agent.config import Settings
-from agent.graph import build_graph
+from agent.core.registry import load_all_agents
 from agent.logging import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -28,21 +28,21 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class InvokeRequest(BaseModel):
-    """Request body for the /invoke endpoint."""
+    """Request body for the /{agent_name}/invoke endpoint."""
 
     messages: list[dict[str, Any]]  # Each dict has "role" and "content"
     thread_id: str | None = None
 
 
 class InvokeResponse(BaseModel):
-    """Response body for the /invoke endpoint."""
+    """Response body for the /{agent_name}/invoke endpoint."""
 
     response: str
     thread_id: str
 
 
 class StreamRequest(BaseModel):
-    """Request body for the /stream endpoint."""
+    """Request body for the /{agent_name}/stream endpoint."""
 
     messages: list[dict[str, Any]]  # Each dict has "role" and "content"
     thread_id: str | None = None
@@ -94,12 +94,12 @@ def create_app(settings: Settings) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         setup_logging(settings.logging)
-        logger.info("Building agent graph...")
-        app.state.graph = build_graph(settings)
-        logger.info("Agent graph ready.")
+        logger.info("Loading agents...")
+        app.state.agents = load_all_agents(settings)
+        logger.info("Agents ready: %s", list(app.state.agents.keys()))
         yield
 
-    app = FastAPI(title="LangGraph Agent", lifespan=lifespan)
+    app = FastAPI(title="LangGraph Multi-Agent", lifespan=lifespan)
 
     # -- CORS middleware ----------------------------------------------------
     app.add_middleware(
@@ -112,17 +112,32 @@ def create_app(settings: Settings) -> FastAPI:
     # -- Endpoints ----------------------------------------------------------
 
     @app.get("/health")
-    async def health() -> dict[str, str]:
-        return {"status": "ok"}
+    async def health() -> dict[str, Any]:
+        agents: list[str] = (
+            list(app.state.agents.keys()) if hasattr(app.state, "agents") else []
+        )
+        return {"status": "ok", "agents": agents}
 
-    @app.post("/invoke", response_model=InvokeResponse)
-    async def invoke(body: InvokeRequest) -> InvokeResponse | JSONResponse:
+    @app.post("/{agent_name}/invoke", response_model=InvokeResponse)
+    async def invoke(
+        agent_name: str, body: InvokeRequest
+    ) -> InvokeResponse | JSONResponse:
+        agents: dict[str, Any] = app.state.agents
+        if agent_name not in agents:
+            return JSONResponse(
+                status_code=404,
+                content=ErrorResponse(
+                    error=f"Agent '{agent_name}' not found",
+                    detail=f"Available agents: {list(agents.keys())}",
+                ).model_dump(),
+            )
+        graph = agents[agent_name]
         try:
             thread_id = body.thread_id or str(uuid.uuid4())
             messages = _convert_messages(body.messages)
             config = {"configurable": {"thread_id": thread_id}}
 
-            result = await app.state.graph.ainvoke(
+            result = await graph.ainvoke(
                 {"messages": messages},
                 config=config,
             )
@@ -142,15 +157,27 @@ def create_app(settings: Settings) -> FastAPI:
                 ).model_dump(),
             )
 
-    @app.post("/stream")
-    async def stream(body: StreamRequest) -> EventSourceResponse:
+    @app.post("/{agent_name}/stream", response_model=None)
+    async def stream(
+        agent_name: str, body: StreamRequest
+    ) -> EventSourceResponse | JSONResponse:
+        agents: dict[str, Any] = app.state.agents
+        if agent_name not in agents:
+            return JSONResponse(
+                status_code=404,
+                content=ErrorResponse(
+                    error=f"Agent '{agent_name}' not found",
+                    detail=f"Available agents: {list(agents.keys())}",
+                ).model_dump(),
+            )
+        graph = agents[agent_name]
         thread_id = body.thread_id or str(uuid.uuid4())
         messages = _convert_messages(body.messages)
         config = {"configurable": {"thread_id": thread_id}}
 
         async def event_generator() -> AsyncGenerator[dict[str, str], None]:
             try:
-                async for event in app.state.graph.astream_events(
+                async for event in graph.astream_events(
                     {"messages": messages},
                     config=config,
                     version="v2",

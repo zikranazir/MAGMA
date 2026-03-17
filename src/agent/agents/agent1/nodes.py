@@ -1,4 +1,4 @@
-"""Graph node factories for the LangGraph agent."""
+"""Graph node factories for agent1."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Any
 from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.prebuilt import ToolNode
 
-from agent.state import AgentState
+from agent.agents.agent1.state import Agent1State
 
 
 def make_agent_node(model: BaseChatModel, tools: list[Any]) -> Callable[..., Any]:
@@ -26,7 +26,7 @@ def make_agent_node(model: BaseChatModel, tools: list[Any]) -> Callable[..., Any
     """
     bound_model = model.bind_tools(tools) if tools else model
 
-    def agent_node(state: AgentState) -> dict[str, Any]:
+    def agent_node(state: Agent1State) -> dict[str, Any]:
         response = bound_model.invoke(state["messages"])
         return {"messages": [response]}
 
